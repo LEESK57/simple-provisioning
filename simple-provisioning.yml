@@ -34,14 +34,27 @@
         Name: webserver Subnet
     register: result_subnet
     
-   - name: create igw
+  - name: Create igw
     ec2_vpc_igw:
-      region: "{{ aws_region }}"           
+      region: "{{ aws_region }}"
       vpc_id: "{{ result_vpc.vpc.id }}"
       state: present
-    register: result_igw
-    
-   - name: Set up public subnet route table
+    register: result_igw 
+  
+  - name: Set up public subnet route table
+    ec2_vpc_route_table:
+      vpc_id: "{{ result_vpc.vpc.id }}"
+      region: "{{ aws_region }}"
+      tags:
+        Name: Public
+      subnets:
+        - "{{ result_subnet.subnet.id }}"
+      routes:
+        - dest: 0.0.0.0/0
+          gateway_id: "{{ result_igw.gateway_id }}"
+    register: result_routetable  
+
+  - name: Set up public subnet route table
     ec2_vpc_route_table:
       vpc_id: "{{ result_vpc.vpc.id }}"
       region: "{{ aws_region }}"
@@ -54,9 +67,9 @@
           gateway_id: "{{ result_igw.gateway_id }}"
     register: result_route_table
     
-   - name: create security group
+  - name: create security group
     ec2_group:
-      name: Security Group
+      name: public SG
       description: sg with rule descriptions
       vpc_id: "{{ result_vpc.vpc.id }}"
       region: "{{ aws_region }}"
@@ -64,17 +77,17 @@
         - proto: tcp
           ports:
           - 80
-          - 22
+          - 22               
           cidr_ip: 0.0.0.0/0
           rule_desc: allow all on port 80
           
-   - name: create EC2
+  - name: create EC2
     ec2:
       key_name: "{{ ec2_key_name }}"
       instance_type: "{{ instance_type }}"
       image: "{{ instance_image }}"
-      wait: no     
-      group: Security Group
+      wait: no 
+      group: public SG
       count: 1
       region: "{{ aws_region }}"
       vpc_subnet_id: "{{ result_subnet.subnet.id }}"
